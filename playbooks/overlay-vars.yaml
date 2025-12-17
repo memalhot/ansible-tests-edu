@@ -1,0 +1,7 @@
+---
+WORKBENCH_SIZE: 20Gi
+WORKBENCH_NAMES:
+  - USER_NAME: memalhot
+    WORKBENCH_ADMIN: true
+  - USER_NAME: danniesh
+OPENSHIFT_APPS_DOMAIN: apps.shift.nerc.mghpcc.org
