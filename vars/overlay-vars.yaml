@@ -1,0 +1,15 @@
+WORKBENCHES:
+  - USER: memalhot
+    NOTEBOOK_NAME: jupyter-ucsls-F24
+    IMAGE_NAME: ucsls-f24
+  - USER: danniesh
+    NOTEBOOK_NAME: jupyer-ucsls-f24
+    IMAGE_NAME: ucsls-f24
+
+RUN_NAME: test-run
+NAMESPACE: workbenches
+OPENSHIFT_URL: https://rhods-dashboard-redhat-ods-applications.apps.edu.nerc.mghpcc.org
+HUB_HOST: https://rhods-dashboard-redhat-ods-applications.apps.edu.nerc.mghpcc.org
+IMAGE_REPO: image-registry.openshift-image-registry.svc:5000/redhat-ods-applications
+PVC_SIZE: 20Gi
+TOKEN: ""

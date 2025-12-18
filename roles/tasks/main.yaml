@@ -2,7 +2,7 @@
   include_tasks: deploy-workbenches.yaml
   vars:
     WORKBENCH_NAMESPACE: "workbench-{{ 'memalhot' if WORKBENCH_NUM == 0 else 'user' + (WORKBENCH_NUM | string) }}"
-    WORKBENCH_NAME: "vscode"
+    WORKBENCH_NAME: "idk"
     USER_NAME: "{{ 'memalhot' if WORKBENCH_NUM == 0 else 'user' + (WORKBENCH_NUM | string) }}"
     WORKBENCH_ADMIN: "{{ WORKBENCH_NUM == 0 }}"
     DATABASE_USERNAME: "{{ SITE_SHORT_NAME }}{{ 'memalhot' if WORKBENCH_NUM == 0 else 'user' + (WORKBENCH_NUM | string) }}"

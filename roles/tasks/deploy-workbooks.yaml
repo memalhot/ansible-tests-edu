@@ -1,0 +1,22 @@
+- name: Render notebook manifests
+  template:
+    src: templates/notebook.yaml
+    dest: /tmp/{{ item.USER_NAME }}-{{ NOTEBOOK_NAME }}.yaml
+  loop: "{{ WORKBENCH_NAMES }}"
+  vars:
+    USER: "{{ item.USER_NAME }}"
+    NOTEBOOK_NAME: test-run
+    IMAGE_NAME: "{{ IMAGE_NAME }}"
+    RUN_NAME: "{{ RUN_NAME }}"
+    NAMESPACE: "{{ NAMESPACE }}"
+    OPENSHIFT_URL: "{{ OPENSHIFT_URL }}"
+    HUB_HOST: "{{ HUB_HOST }}"
+    IMAGE_REPO: "{{ IMAGE_REPO | default('image-registry.openshift-image-registry.svc:5000/redhat-ods-applications') }}"
+    PVC_SIZE: "{{ PVC_SIZE | default('20Gi') }}"
+    TOKEN: "{{ TOKEN | default('') }}"
+
+- name: Apply notebooks
+  command: >
+    oc apply -f /tmp/{{ item.USER_NAME }}-{{ NOTEBOOK_NAME }}.yaml
+    -n {{ NAMESPACE }}
+  loop: "{{ WORKBENCH_NAMES }}"
