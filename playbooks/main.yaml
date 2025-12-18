@@ -1,0 +1,18 @@
+- name: "Deploy workbenches"
+  include_tasks: deploy-workbenches.yaml
+  vars:
+    WORKBENCH_NAMESPACE: "workbench-{{ 'memalhot' if WORKBENCH_NUM == 0 else 'user' + (WORKBENCH_NUM | string) }}"
+    WORKBENCH_NAME: "vscode"
+    USER_NAME: "{{ 'memalhot' if WORKBENCH_NUM == 0 else 'user' + (WORKBENCH_NUM | string) }}"
+    WORKBENCH_ADMIN: "{{ WORKBENCH_NUM == 0 }}"
+    DATABASE_USERNAME: "{{ SITE_SHORT_NAME }}{{ 'memalhot' if WORKBENCH_NUM == 0 else 'user' + (WORKBENCH_NUM | string) }}"
+  tags:
+    - deploy-notebooks
+    - deploy-rolebindings
+    - deploy-configmaps
+    - deploy-vars
+    - create-database
+  loop: "{{ range(0, (WORKBENCH_COUNT | int) + 1, 1) | list }}"
+  loop_control:
+    loop_var: WORKBENCH_NUM
+    index_var: WORKBENCH_INDEX

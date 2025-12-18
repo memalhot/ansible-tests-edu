@@ -1,151 +1,139 @@
-apiVersion: kubeflow.org/v1
+# Required Ansible vars:
+#   NOTEBOOK_NAME, RUN_NAME, USERNAME, IMAGE_NAME, NAMESPACE, OPENSHIFT_URL, USER, HUB_HOST
+# Optional (with defaults below):
+#   IMAGE_REPO (default to OCP internal registry), PVC_SIZE ("20Gi"), TOKEN ("")
+
+apiVersion: kubeflow.org/v1beta1
 kind: Notebook
 metadata:
-  annotations:
-    notebooks.opendatahub.io/inject-oauth: 'true'
-    opendatahub.io/image-display-name: ucsls-F24
-    notebooks.opendatahub.io/oauth-logout-url: 'https://rhods-dashboard-redhat-ods-applications.apps.edu.nerc.mghpcc.org/projects/{{ WORKBENCH_NAMESPACE }}?notebookLogout={{ WORKBENCH_NAME }}'
-    opendatahub.io/accelerator-name: ''
-    openshift.io/description: ''
-    openshift.io/display-name: {{ WORKBENCH_NAME }}
-    notebooks.opendatahub.io/last-image-selection: 'ucsls-F24'
-    notebooks.opendatahub.io/last-size-selection: X Small
-    opendatahub.io/username: {{ WORKBENCH_NAME }}
-  name: {{ WORKBENCH_NAME }}
-  namespace: {{ WORKBENCH_NAMESPACE }}
+  name: {{ NOTEBOOK_NAME }}
   labels:
-    app: {{ WORKBENCH_NAME }}
+    app: {{ NOTEBOOK_NAME }}
+    ope-run: {{ RUN_NAME }}
     opendatahub.io/dashboard: 'true'
     opendatahub.io/odh-managed: 'true'
-    opendatahub.io/user: {{ WORKBENCH_NAME }}
+    opendatahub.io/user: {{ USER }}
+  annotations:
+    notebooks.opendatahub.io/inject-oauth: 'true'
+    notebooks.opendatahub.io/last-image-selection: {{ IMAGE_NAME }}
+    notebooks.opendatahub.io/last-size-selection: Small
+    notebooks.opendatahub.io/oauth-logout-url: {{ OPENSHIFT_URL }}/{{ NAMESPACE }}?notebookLogout={{ NOTEBOOK_NAME }}
+    opendatahub.io/username: {{ USER }}
+    openshift.io/description: ''
+    openshift.io/display-name: {{ NOTEBOOK_NAME }}
+    opendatahub.io/image-display-name: {{ IMAGE_NAME }}
 spec:
   template:
     spec:
-      affinity: {}
+      serviceAccountName: {{ NOTEBOOK_NAME }}
+      enableServiceLinks: false
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 1
+              preference:
+                matchExpressions:
+                  - key: nvidia.com/gpu.present
+                    operator: In
+                    values:
+                      - 'false'
       containers:
-        - resources:
+        - name: {{ NOTEBOOK_NAME }}
+          image: {{ IMAGE_REPO | default("image-registry.openshift-image-registry.svc:5000/redhat-ods-applications") }}/{{ IMAGE_NAME }}:latest
+          imagePullPolicy: Always
+          workingDir: /opt/app-root/src
+          ports:
+            - containerPort: 8888
+              name: notebook-port
+              protocol: TCP
+          resources:
             limits:
               cpu: '2'
               memory: 8Gi
             requests:
               cpu: '1'
               memory: 8Gi
-          readinessProbe:
-            failureThreshold: 3
-            httpGet:
-              path: /notebook/{{ WORKBENCH_NAMESPACE }}/{{ WORKBENCH_NAME }}/api
-              port: notebook-port
-              scheme: HTTP
-            initialDelaySeconds: 10
-            periodSeconds: 5
-            successThreshold: 1
-            timeoutSeconds: 1
-          name: {{ WORKBENCH_NAME }}
-          livenessProbe:
-            failureThreshold: 3
-            httpGet:
-              path: /notebook/{{ WORKBENCH_NAMESPACE }}/{{ WORKBENCH_NAME }}/api
-              port: notebook-port
-              scheme: HTTP
-            initialDelaySeconds: 10
-            periodSeconds: 5
-            successThreshold: 1
-            timeoutSeconds: 1
           env:
             - name: NOTEBOOK_ARGS
               value: |-
                 --ServerApp.port=8888
-                                  --ServerApp.token=''
-                                  --ServerApp.password=''
-                                  --ServerApp.base_url=/notebook/{{ WORKBENCH_NAMESPACE }}/{{ WORKBENCH_NAME }}
-                                  --ServerApp.quit_button=False
-                                  --ServerApp.tornado_settings={"user":"{{ WORKBENCH_NAME }}","hub_host":"https://rhods-dashboard-redhat-ods-applications.apps.edu.nerc.mghpcc.org/","hub_prefix":"/projects/{{ WORKBENCH_NAMESPACE }}"}
+                --ServerApp.token={{ TOKEN | default('') }}
+                --ServerApp.password=''
+                --ServerApp.base_url=/notebook/{{ NAMESPACE }}/{{ NOTEBOOK_NAME }}
+                --ServerApp.quit_button=False
+                --ServerApp.tornado_settings={{ {"user": USER, "hub_host": HUB_HOST, "hub_prefix": "/projects/" ~ NAMESPACE} | tojson }}
             - name: JUPYTER_IMAGE
-              value: 'image-registry.openshift-image-registry.svc:5000/redhat-ods-applications/ai-telemetry-workbench:1.1.0'
-            - name: GIT_SSL_CAINFO
-              value: /etc/pki/tls/custom-certs/ca-bundle.crt
-            - name: PIP_CERT
-              value: /etc/pki/tls/custom-certs/ca-bundle.crt
-            - name: REQUESTS_CA_BUNDLE
-              value: /etc/pki/tls/custom-certs/ca-bundle.crt
-            - name: SSL_CERT_FILE
-              value: /etc/pki/tls/custom-certs/ca-bundle.crt
-            - name: PIPELINES_SSL_SA_CERTS
-              value: /etc/pki/tls/custom-certs/ca-bundle.crt
-          ports:
-            - containerPort: 8888
-              name: notebook-port
-              protocol: TCP
-          imagePullPolicy: Always
+              value: {{ IMAGE_REPO | default("image-registry.openshift-image-registry.svc:5000/redhat-ods-applications") }}/{{ IMAGE_NAME }}:latest
+          readinessProbe:
+            httpGet:
+              path: /notebook/{{ NAMESPACE }}/{{ NOTEBOOK_NAME }}/api
+              port: notebook-port
+              scheme: HTTP
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 1
+            successThreshold: 1
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /notebook/{{ NAMESPACE }}/{{ NOTEBOOK_NAME }}/api
+              port: notebook-port
+              scheme: HTTP
+            initialDelaySeconds: 30
+            periodSeconds: 5
+            timeoutSeconds: 1
+            successThreshold: 1
+            failureThreshold: 3
           volumeMounts:
-            - mountPath: /opt/app-root/src
-              name: {{ WORKBENCH_NAME }}
-            - mountPath: /dev/shm
-              name: shm
-            - mountPath: /etc/pki/tls/custom-certs/ca-bundle.crt
-              name: trusted-ca
-              readOnly: true
-              subPath: ca-bundle.crt
-          envFrom:
-            - configMapRef:
-                name: workbench-{{ WORKBENCH_NAME }}-default
-            - configMapRef:
-                name: workbench-{{ WORKBENCH_NAME }}-{{ SITE_NAME }}
-            - secretRef:
-                name: keycloak-client-ai-telemetry
-            - secretRef:
-                name: keycloak-client-ai-telemetry-sa
-          image: 'image-registry.openshift-image-registry.svc:5000/redhat-ods-applications/ai-telemetry-workbench:1.1.0'
-          workingDir: /opt/app-root/src
-        - resources:
+            - name: {{ NOTEBOOK_NAME }}
+              mountPath: /opt/app-root/src
+            - name: shm
+              mountPath: /dev/shm
+
+        - name: oauth-proxy
+          image: registry.redhat.io/openshift4/ose-oauth-proxy@sha256:4bef31eb993feb6f1096b51b4876c65a6fb1f4401fee97fa4f4542b6b7c9bc46
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8443
+              name: oauth-proxy
+              protocol: TCP
+          resources:
             limits:
               cpu: 100m
               memory: 64Mi
             requests:
               cpu: 100m
               memory: 64Mi
+          env:
+            - name: NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
           readinessProbe:
-            failureThreshold: 3
             httpGet:
               path: /oauth/healthz
               port: oauth-proxy
               scheme: HTTPS
             initialDelaySeconds: 5
             periodSeconds: 5
-            successThreshold: 1
             timeoutSeconds: 1
-          name: oauth-proxy
-          livenessProbe:
+            successThreshold: 1
             failureThreshold: 3
+          livenessProbe:
             httpGet:
               path: /oauth/healthz
               port: oauth-proxy
               scheme: HTTPS
             initialDelaySeconds: 30
             periodSeconds: 5
-            successThreshold: 1
             timeoutSeconds: 1
-          env:
-            - name: NAMESPACE
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.namespace
-          ports:
-            - containerPort: 8443
-              name: oauth-proxy
-              protocol: TCP
-          imagePullPolicy: Always
-          volumeMounts:
-            - mountPath: /etc/oauth/config
-              name: oauth-config
-            - mountPath: /etc/tls/private
-              name: tls-certificates
-          image: 'registry.redhat.io/openshift4/ose-oauth-proxy@sha256:4f8d66597feeb32bb18699326029f9a71a5aca4a57679d636b876377c2e95695'
+            successThreshold: 1
+            failureThreshold: 3
           args:
             - '--provider=openshift'
             - '--https-address=:8443'
             - '--http-address='
-            - '--openshift-service-account={{ WORKBENCH_NAME }}'
+            - '--openshift-service-account={{ NOTEBOOK_NAME }}'
             - '--cookie-secret-file=/etc/oauth/config/cookie_secret'
             - '--cookie-expire=24h0m0s'
             - '--tls-cert=/etc/tls/private/tls.crt'
@@ -154,29 +142,44 @@ spec:
             - '--upstream-ca=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt'
             - '--email-domain=*'
             - '--skip-provider-button'
-            - '--openshift-sar={"verb":"get","resource":"notebooks","resourceAPIGroup":"kubeflow.org","resourceName":"{{ WORKBENCH_NAME }}","namespace":"$(NAMESPACE)"}'
-            - '--logout-url=https://rhods-dashboard-redhat-ods-applications.apps.k5p2r6m6e1c4d2r.dq2p.p2.openshiftapps.com/projects/{{ WORKBENCH_NAMESPACE }}?notebookLogout={{ WORKBENCH_NAME }}'
-      enableServiceLinks: false
-      serviceAccountName: {{ WORKBENCH_NAME }}
+            - >-
+              --openshift-sar={{ {"verb":"get","resource":"notebooks","resourceAPIGroup":"kubeflow.org","resourceName": NOTEBOOK_NAME, "namespace":"$(NAMESPACE)"} | tojson }}
+            - >-
+              --logout-url={{ OPENSHIFT_URL }}/{{ NAMESPACE }}?notebookLogout={{ NOTEBOOK_NAME }}
+          volumeMounts:
+            - name: oauth-config
+              mountPath: /etc/oauth/config
+            - name: tls-certificates
+              mountPath: /etc/tls/private
+
       volumes:
-        - name: {{ WORKBENCH_NAME }}
+        - name: {{ NOTEBOOK_NAME }}
           persistentVolumeClaim:
-            claimName: {{ WORKBENCH_NAME }}
-        - emptyDir:
+            claimName: {{ NOTEBOOK_NAME }}
+        - name: shm
+          emptyDir:
             medium: Memory
-          name: shm
-        - configMap:
-            items:
-              - key: ca-bundle.crt
-                path: ca-bundle.crt
-            name: workbench-trusted-ca-bundle
-            optional: true
-          name: trusted-ca
         - name: oauth-config
           secret:
+            secretName: {{ NOTEBOOK_NAME }}-oauth-config
             defaultMode: 420
-            secretName: {{ WORKBENCH_NAME }}-oauth-config
         - name: tls-certificates
           secret:
+            secretName: {{ NOTEBOOK_NAME }}-tls
             defaultMode: 420
-            secretName: {{ WORKBENCH_NAME }}-tls
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ NOTEBOOK_NAME }}
+  labels:
+    app: {{ NOTEBOOK_NAME }}
+    notebook-name: {{ NOTEBOOK_NAME }}
+    ope-run: {{ RUN_NAME }}
+    opendatahub.io/dashboard: 'true'
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: "{{ PVC_SIZE | default('20Gi') }}"
