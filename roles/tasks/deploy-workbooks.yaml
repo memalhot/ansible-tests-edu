@@ -17,6 +17,20 @@
 
 - name: Apply notebooks
   command: >
-    oc apply -f /tmp/{{ item.USER_NAME }}-{{ NOTEBOOK_NAME }}.yaml
-    -n {{ NAMESPACE }}
+    oc apply -f /tmp/{{ item.USER_NAME }}-{{ NOTEBOOK_NAME }}.yaml -n {{ NAMESPACE }}
+  loop: "{{ WORKBENCH_NAMES }}"
+
+# RBAC (rolebindings) for each workbench
+- name: Render rolebinding manifests
+  template:
+    src: templates/rolebindings.yaml
+    dest: /tmp/{{ item.USER_NAME }}-{{ NOTEBOOK_NAME }}-rbac.yaml
+  loop: "{{ WORKBENCH_NAMES }}"
+  vars:
+    WORKBENCH_NAME: "{{ NOTEBOOK_NAME | default('test-run') }}"
+    WORKBENCH_NAMESPACE: "{{ NAMESPACE }}"
+
+- name: Apply rolebindings
+  command: >
+    oc apply -f /tmp/{{ item.USER_NAME }}-{{ NOTEBOOK_NAME }}-rbac.yaml -n {{ NAMESPACE }}
   loop: "{{ WORKBENCH_NAMES }}"
